@@ -21,7 +21,10 @@ def pkcs7_unpad(data: bytes, block: int = 16) -> bytes:
 # ===== 전송(개행 CRLF 허용) =====
 def send_json(sock, obj):
     # 일부 서버는 CRLF를 기대하므로 \r\n 사용
-    sock.sendall((json.dumps(obj) + "\r\n").encode("utf-8"))
+    # sock.sendall((json.dumps(obj) + "\r\n").encode("utf-8"))
+    sock.sendall(
+        (json.dumps(obj) + "\r\n").encode()
+    )  # 굳이 utf-8로 인코딩 안해도 될듯. str형식은 안되므로 인코딩 하여 바이트 형식으로 바꿔야함
 
 
 # ===== 관대한 수신: 개행 유무/서버-먼저-전송 모두 커버 =====
@@ -54,14 +57,14 @@ def recv_json_lenient(sock, timeout=30.0, max_bytes=1_000_000):
                     pass
 
         # 2) 개행이 전혀 없을 때: 중괄호 균형으로 완결 판단
-        for b in chunk:
-            if b == ord("{"):
-                braces += 1
-                started = True
-            elif b == ord("}"):
-                braces -= 1
-                if started and braces == 0:
-                    return json.loads(buf.decode("utf-8"))
+        # for b in chunk:
+        #     if b == ord("{"):
+        #         braces += 1
+        #         started = True
+        #     elif b == ord("}"):
+        #         braces -= 1
+        #         if started and braces == 0:
+        #             return json.loads(buf.decode("utf-8"))
 
 
 def main():
@@ -74,7 +77,7 @@ def main():
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        s.settimeout(30.0)  # 연결/수신 모두 넉넉히
+        s.settimeout(5.0)  # 연결/수신 모두 넉넉히
         s.connect((args.addr, args.port))
         logging.info(f"[Alice] connected to {args.addr}:{args.port}")
 

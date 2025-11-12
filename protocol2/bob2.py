@@ -1,4 +1,4 @@
-import socket, threading, argparse, logging, json, random, base64, os
+import socket, threading, argparse, logging, json, random, base64
 from math import gcd
 from Crypto.Cipher import AES
 
