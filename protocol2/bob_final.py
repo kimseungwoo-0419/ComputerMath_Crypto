@@ -11,13 +11,13 @@ def pkcs7_pad(data: bytes, block_size: int = 16) -> bytes:
 
 
 def pkcs7_unpad(data: bytes, block_size: int = 16) -> bytes:
-    if not data or len(data) % block_size != 0:
-        raise ValueError("invalid padding: length")
+    # if not data or len(data) % block_size != 0:
+    #     raise ValueError("invalid padding: length")
     pad_len = data[-1]
-    if not (1 <= pad_len <= block_size):
-        raise ValueError("invalid padding: value")
-    if data[-pad_len:] != bytes([pad_len]) * pad_len:
-        raise ValueError("invalid padding: pattern")
+    # if not (1 <= pad_len <= block_size):
+    #     raise ValueError("invalid padding: value")
+    # if data[-pad_len:] != bytes([pad_len]) * pad_len:
+    #     raise ValueError("invalid padding: pattern")
     return data[:-pad_len]
 
 
@@ -89,7 +89,7 @@ def recv_line(sock, timeout=10.0):
 
 
 def send_json(sock, obj):
-    sock.sendall((json.dumps(obj) + "\n").encode("utf-8"))
+    sock.sendall((json.dumps(obj) + "\n").encode())
 
 
 # ===== handler =====

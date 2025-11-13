@@ -3,7 +3,7 @@ from Crypto.Cipher import AES
 import random
 
 
-# ===== PKCS#7 pad/unpad =====
+# PKCS#7 pad/unpad
 def pkcs7_pad(data: bytes, block: int = 16) -> bytes:
     r = len(data) % block
     pad = block - r if r else block
@@ -19,29 +19,20 @@ def pkcs7_unpad(data: bytes, block: int = 16) -> bytes:
     return data[:-pad]
 
 
-# ===== 전송(개행 CRLF 허용) =====
+# 전송(개행 CRLF 허용)
 def send_json(sock, obj):
-    sock.sendall(
-        (json.dumps(obj) + "\r\n").encode()
-    )  # 굳이 utf-8로 인코딩 안해도 될듯. str형식은 안되므로 인코딩 하여 바이트 형식으로 바꿔야함
+    sock.sendall((json.dumps(obj) + "\n").encode())
 
 
-# ===== 관대한 수신: 개행 유무/서버-먼저-전송 모두 커버 =====
+# 관대한 수신: 개행 유무/서버-먼저-전송 모두 커버
 def recv_json_lenient(sock, timeout=30.0, max_bytes=1_000_000):
     sock.settimeout(timeout)
     buf = b""
 
     while True:
-        chunk = sock.recv(4096)  # 여기서 timeout 발생 가능
+        chunk = sock.recv(4096)
         buf += chunk
-        if len(buf) > max_bytes:
-            raise RuntimeError("response too large")
-
-        # 매 루프마다 전체 버퍼 파싱 먼저 시도
-        try:
-            return json.loads(buf.decode())
-        except Exception:
-            pass
+        return json.loads(buf.decode())
 
 
 def main():
@@ -54,7 +45,7 @@ def main():
 
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
-        s.settimeout(30.0)  # 연결/수신 모두 넉넉히
+        s.settimeout(10.0)
         s.connect((args.addr, args.port))
         logging.info(f"[Alice] connected to {args.addr}:{args.port}")
         # 1차 시도: type="RSA"
