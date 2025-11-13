@@ -53,17 +53,17 @@ def recv_json_lenient(sock, timeout=30.0, max_bytes=1_000_000):
         if len(buf) > max_bytes:
             raise RuntimeError("response too large")
 
-        # 0) 매 루프마다 전체 버퍼 파싱 먼저 시도 (개행이 없어도 처리)
+        # 매 루프마다 전체 버퍼 파싱 먼저 시도
         try:
-            return json.loads(buf.decode("utf-8"))
+            return json.loads(buf.decode())
         except Exception:
             pass
 
-        # 1) 개행(또는 CRLF)이 있으면 첫 줄 파싱 시도
+        # 개행(또는 CRLF)이 있으면 첫 줄 파싱 시도
         if b"\n" in buf or b"\r\n" in buf:
             first_line = buf.splitlines()[0]
             try:
-                return json.loads(first_line.decode("utf-8"))
+                return json.loads(first_line.decode())
             except Exception:
                 # 2) 첫 줄이 불완전할 수 있으니 전체 버퍼 재시도(위에서 이미 시도했음)
                 pass
@@ -85,61 +85,61 @@ def main():
 
         # (옵션) 서버가 먼저 보내는 환경 탐지
         peek = None
-        try:
-            peek = recv_json_lenient(s, timeout=5.0)
-        except Exception:
-            peek = None
+        # try:
+        #     peek = recv_json_lenient(s, timeout=5.0)
+        # except Exception:
+        #     peek = None
 
-        if peek:
-            logging.info(f"[Alice] server-first message: {peek}")
+        # if peek:
+        #     logging.info(f"[Alice] server-first message: {peek}")
 
-            # 서버가 이미 RSA 공개키를 준 경우 지원
-            if str(peek.get("type", "")).upper().startswith("RSA"):
-                resp1 = peek
-            else:
-                # 서버가 다른 안내만 보냈다면 표준 요청을 보낸다
-                send_json(s, {"opcode": 0, "type": "RSA"})
-                resp1 = recv_json_lenient(s, timeout=25.0)
-        else:
-            # 1차 시도: type="RSA"
-            send_json(s, {"opcode": 0, "type": "RSA"})
-            resp1 = recv_json_lenient(s, timeout=18.0)
-            # 2차 시도: type="RSAKey"
-            if not resp1:
-                send_json(s, {"opcode": 0, "type": "RSAKey"})
-                resp1 = recv_json_lenient(s, timeout=18.0)
+        #     # 서버가 이미 RSA 공개키를 준 경우 지원
+        #     # if str(peek.get("type", "")).upper().startswith("RSA"):
+        #     #     resp1 = peek
+        #     # else:
+        #     # 서버가 다른 안내만 보냈다면 표준 요청을 보낸다
+        #     send_json(s, {"opcode": 0, "type": "RSA"})
+        #     resp1 = recv_json_lenient(s, timeout=25.0)
+        # else:
+        # 1차 시도: type="RSA"
+        send_json(s, {"opcode": 0, "type": "RSA"})
+        resp1 = recv_json_lenient(s, timeout=18.0)
+        # 2차 시도: type="RSAKey"
+        # if not resp1:
+        #     send_json(s, {"opcode": 0, "type": "RSAKey"})
+        #     resp1 = recv_json_lenient(s, timeout=18.0)
 
-        if not resp1:
-            raise RuntimeError("no response for RSA pubkey")
-        if resp1.get("opcode") == 3:
-            raise RuntimeError(f"Bob error: {resp1.get('error')}")
+        # if not resp1:
+        #     raise RuntimeError("no response for RSA pubkey")
+        # if resp1.get("opcode") == 3:
+        #     raise RuntimeError(f"Bob error: {resp1.get('error')}")
 
         e = int(resp1["public"])
         n = int(resp1["parameter"]["n"])
         logging.info(f"[Alice] received RSA pubkey e={e}, n={n}")
 
-        # --- AES 키 생성 & RSA로 바이트 단위 암호화 전송 ---
+        # AES 키 생성 & RSA로 바이트 단위 암호화 전송
         aes_key = bytes(random.getrandbits(8) for _ in range(32))  # 256-bit
         enc_list = [pow(b, e, n) for b in aes_key]
         send_json(s, {"opcode": 2, "type": "RSA", "encrypted_key": enc_list})
         logging.info("[Alice] sent RSA-encrypted AES key")
 
-        # --- Bob → AES("hello") 수신 & 복호 ---
+        # Bob → AES("hello") 수신 & 복호
         resp2 = recv_json_lenient(s, timeout=25.0)
-        if not resp2:
-            raise RuntimeError("no AES message from Bob")
-        if resp2.get("opcode") == 3:
-            raise RuntimeError(f"Bob error: {resp2.get('error')}")
+        # if not resp2:
+        #     raise RuntimeError("no AES message from Bob")
+        # if resp2.get("opcode") == 3:
+        #     raise RuntimeError(f"Bob error: {resp2.get('error')}")
         cipher = AES.new(aes_key, AES.MODE_ECB)
         ct = base64.b64decode(resp2["encryption"])
         pt = pkcs7_unpad(cipher.decrypt(ct), 16)
         logging.info(f'[Alice] Decrypted from Bob: "{pt.decode()}"')
 
-        # --- "world" 암호화해서 전송 ---
-        ct2 = cipher.encrypt(pkcs7_pad(b"world", 16))
+        # 암호화해서 전송
+        ct2 = cipher.encrypt(pkcs7_pad(b"KENDEX", 16))
         b64 = base64.b64encode(ct2).decode("utf-8")
         send_json(s, {"opcode": 2, "type": "AES", "encryption": b64})
-        logging.info("[Alice] sent AES ciphertext (world)")
+        logging.info("[Alice] sent AES ciphertext")
 
     except Exception as e:
         logging.exception(f"[Alice] error: {e}")
